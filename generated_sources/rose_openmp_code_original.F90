@@ -1239,15 +1239,18 @@ blockOffset = blockOffset + nblocks
 END DO
 END SUBROUTINE 
 
-SUBROUTINE save_soln_modified(q,qold)
+SUBROUTINE save_soln_modified(q,qold,s)
 IMPLICIT NONE
-REAL(kind=8), DIMENSION(*) :: q
-REAL(kind=8), DIMENSION(*) :: qold
-INTEGER(kind=4) :: i
+REAL(kind=8), DIMENSION(4, *) :: q
+REAL(kind=8), DIMENSION(4, *) :: qold
+integer :: s
+INTEGER(kind=4) :: i,j
 !  call levelTwo (qold)
+do j = 1, s
 DO i = 1, 4
-qold(i) = q(i)
+qold(i,j) = q(i,j)
 END DO
+end do
 END SUBROUTINE 
 
 SUBROUTINE save_soln_kernel(opDat1,opDat2,sliceStart,sliceEnd)
@@ -1259,9 +1262,7 @@ INTEGER(kind=4) :: sliceEnd
 INTEGER(kind=4) :: i1
 integer(8) :: time1, time2, count_rate, count_max
 call system_clock(time1, count_rate, count_max)
-DO i1 = sliceStart, sliceEnd - 1, 1
-CALL save_soln_modified(opDat1(i1 * 4:i1 * 4 + 4 - 1),opDat2(i1 * 4:i1 * 4 + 4 - 1))
-END DO
+CALL save_soln_modified(opDat1(sliceStart * 4:(sliceEnd - 1)  * 4 + 3), opDat2(sliceStart * 4:(sliceEnd-1) * 4 + 3),sliceEnd - sliceStart)
 call system_clock(time2, count_rate, count_max)
 print *, "### save_soln",time2 - time1
 END SUBROUTINE 
