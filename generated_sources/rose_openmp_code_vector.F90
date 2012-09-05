@@ -5,7 +5,7 @@ USE OP2_CONSTANTS
 #ifdef _OPENMP 
 USE OMP_LIB
 #endif 
-#define BS 8
+#define BS 4
 REAL(kind=8) :: alpha_OP2_CONSTANT
 REAL(kind=8) :: cfl_OP2_CONSTANT
 REAL(kind=8) :: eps_OP2_CONSTANT
@@ -202,11 +202,14 @@ integer(8) :: time1g, time2g, count_rateg, count_maxg
 real(kind=8), allocatable, dimension(:) :: arg1, arg2, arg3, arg4, arg5
 threadBlockID = blkmap(blockID + blockOffset)
 numberOfActiveThreads = nelems(threadBlockID)
+call system_clock(time1, count_rate, count_max)
 allocate (arg1(numberOfActiveThreads*2))
 allocate (arg2(numberOfActiveThreads*2))
 allocate (arg3(numberOfActiveThreads*2))
 allocate (arg4(numberOfActiveThreads*2))
 allocate (arg5(numberOfActiveThreads*4))
+call system_clock(time2, count_rate, count_max)
+print *, "### not counted"
 threadBlockOffset = offset(threadBlockID)
 opDat1SharedIndirectionSize = ind_sizes(0 + threadBlockID * 1)
 opDat1IndirectionMap => ind_maps1(ind_offs(0 + threadBlockID * 1):)
@@ -217,8 +220,10 @@ DO i2 = 0, 2 - 1, 1
 opDat1SharedIndirection(i2 + i1 * 2 + 1) = opDat1(i2 + opDat1IndirectionMap(i1 + 1) * 2)
 END DO
 END DO
-!LOLOLOLOL
+call system_clock(time1, count_rate, count_max)
 call mkl_domatcopy('r', 't', numberOfActiveThreads, 4, 1.d0, opDat5(4*threadBlockOffset:4*(numberOfActiveThreads-1+threadBlockOffset) + 3), 4, arg5, numberOfActiveThreads)
+call system_clock(time2, count_rate, count_max)
+print *, "### not counted"
 call system_clock(time1g, count_rateg, count_maxg)
 DO i1 = 0, numberOfActiveThreads - 1, 1
 arg1(i1 + 1) = opDat1SharedIndirection(1 + mappingArray1(i1 + threadBlockOffset) * 2)
@@ -229,7 +234,6 @@ arg3(i1 + 1) = opDat1SharedIndirection(1 + mappingArray3(i1 + threadBlockOffset)
 arg3(i1 + numberOfActiveThreads + 1) = opDat1SharedIndirection(1 + mappingArray3(i1 + threadBlockOffset) * 2 + 1)
 arg4(i1 + 1) = opDat1SharedIndirection(1 + mappingArray4(i1 + threadBlockOffset) * 2)
 arg4(i1 + numberOfActiveThreads + 1) = opDat1SharedIndirection(1 + mappingArray4(i1 + threadBlockOffset) * 2 + 1)
-!CALL adt_calc_modified(opDat1SharedIndirection(1 + mappingArray1(i1 + threadBlockOffset) * 2:1 + mappingArray1(i1 + threadBlockOffset) * 2 + 2 - 1),opDat1SharedIndirection(1 + mappingArray2(i1 + threadBlockOffset) * 2:1 + mappingArray2(i1 + threadBlockOffset) * 2 + 2 - 1),opDat1SharedIndirection(1 + mappingArray3(i1 + threadBlockOffset) * 2:1 + mappingArray3(i1 + threadBlockOffset) * 2 + 2 - 1),opDat1SharedIndirection(1 + mappingArray4(i1 + threadBlockOffset) * 2:1 + mappingArray4(i1 + threadBlockOffset) * 2 + 2 - 1),opDat5((i1 + threadBlockOffset) * 4:(i1 + threadBlockOffset) * 4 + 4 - 1),opDat6((i1 + threadBlockOffset) * 1:(i1 + threadBlockOffset) * 1 + 1 - 1))
 END DO
 call system_clock(time1, count_rate, count_max)
 call adt_calc_kernel_caller(arg1,arg2,arg3,arg4,arg5,opDat6(threadBlockOffset:threadBlockOffset+numberOfActiveThreads-1), numberOfActiveThreads)
@@ -247,7 +251,10 @@ opDat1SharedIndirection(1 + mappingArray4(i1 + threadBlockOffset) * 2 + 1) = arg
 END DO
 call system_clock(time2g, count_rateg, count_maxg)
 print *, "### adt_gather", time2g - time1g
+call system_clock(time1, count_rate, count_max)
 call mkl_domatcopy('r', 't', 4, numberOfActiveThreads, 1.d0, arg5, numberOfActiveThreads, opDat5(4*threadBlockOffset:4*(numberOfActiveThreads-1+threadBlockOffset) + 3), 4)
+call system_clock(time2, count_rate, count_max)
+print *, "### not counted", time2 - time1
 deallocate (arg1)
 deallocate (arg2)
 deallocate (arg3)
@@ -256,6 +263,7 @@ deallocate (arg5)
 END SUBROUTINE 
 
 subroutine adt_calc_kernel_caller(x1, x2, x3, x4, q, adt, iterations)
+
   implicit none
   real(kind=8), dimension(BS, iterations/BS, 2) :: x1, x2, x3, x4
   real(kind=8), dimension(BS, iterations/BS, 4) :: q
@@ -1621,24 +1629,24 @@ INTEGER(kind=4) :: i1, diff
 integer(8) :: time1, time2, count_rate, count_max
 real(kind=8), allocatable, dimension(:) :: topDat1, topDat2
 diff = sliceEnd - sliceStart
+call system_clock(time1, count_rate, count_max)
 allocate (topDat1(diff*4))
 allocate (topDat2(diff*4))
 call mkl_domatcopy('r','t',diff,4,1.d0,opDat1(4*sliceStart:4*sliceEnd-1),4,topDat1,diff)
 call mkl_domatcopy('r','t',diff,4,1.d0,opDat2(4*sliceStart:4*sliceEnd-1),4,topDat2,diff)
+call system_clock(time2, count_rate, count_max)
+print *, "### not counted", time2 - time1
 call system_clock(time1, count_rate, count_max)
 CALL save_soln_caller(topDat1, topDat2, diff)
 call system_clock(time2, count_rate, count_max)
 print *, "### save_soln", time2 - time1
+call system_clock(time1, count_rate, count_max)
 call mkl_domatcopy('r','t',4,diff,1.d0,topDat1,diff,opDat1(4*sliceStart:4*sliceEnd-1),4)
 call mkl_domatcopy('r','t',4,diff,1.d0,topDat2,diff,opDat2(4*sliceStart:4*sliceEnd-1),4)
 deallocate (topDat1)
 deallocate (topDat2)
-!call system_clock(time1, count_rate, count_max)
-!DO i1 = sliceStart, sliceEnd - 1, 1
-!CALL save_soln_modified(opDat1(i1 * 4:i1 * 4 + 4 - 1),opDat2(i1 * 4:i1 * 4 + 4 - 1))
-!END DO
-!call system_clock(time2, count_rate, count_max)
-!print *, "### save_soln",time2 - time1
+call system_clock(time2, count_rate, count_max)
+print *, "### not counted", time2 - time1
 END SUBROUTINE 
 
 subroutine save_soln_caller(q, qold, diff)
@@ -1737,22 +1745,28 @@ INTEGER(kind=4) :: i1, diff
 integer(8) :: time1, time2, count_rate, count_max
 real(kind=8), allocatable, dimension(:) :: topDat1, topDat2, topDat3
 diff = sliceEnd - sliceStart
+call system_clock(time1, count_rate, count_max)
 allocate (topDat1(diff*4))
 allocate (topDat2(diff*4))
 allocate (topDat3(diff*4))
 call mkl_domatcopy('r', 't', diff, 4, 1.d0, opDat1(4*sliceStart:4*sliceEnd-1), 4, topDat1, diff)
 call mkl_domatcopy('r', 't', diff, 4, 1.d0, opDat2(4*sliceStart:4*sliceEnd-1), 4, topDat2, diff)
 call mkl_domatcopy('r', 't', diff, 4, 1.d0, opDat3(4*sliceStart:4*sliceEnd-1), 4, topDat3, diff)
+call system_clock(time2, count_rate, count_max)
+print *, "### not counted", time2 - time1
 call system_clock(time1, count_rate, count_max)
 call update_kernel_caller(topDat1, topDat2, topDat3, opDat4(sliceStart:sliceStart+diff-1), opDat5, diff)
 call system_clock(time2, count_rate, count_max)
 print *,"### update" ,time2 - time1
+call system_clock(time1, count_rate, count_max)
 call mkl_domatcopy('r', 't', 4, diff, 1.d0, topDat1, diff, opDat1(4*sliceStart:4*sliceEnd-1), 4)
 call mkl_domatcopy('r', 't', 4, diff, 1.d0, topDat2, diff, opDat2(4*sliceStart:4*sliceEnd-1), 4)
 call mkl_domatcopy('r', 't', 4, diff, 1.d0, topDat3, diff, opDat3(4*sliceStart:4*sliceEnd-1), 4)
 deallocate (topDat1)
 deallocate (topDat2)
 deallocate (topDat3)
+call system_clock(time2, count_rate, count_max)
+print *, "### not counted", time2 - time1
 END SUBROUTINE
 
 subroutine update_kernel_caller(qold, q, res, adt, rms, diff)

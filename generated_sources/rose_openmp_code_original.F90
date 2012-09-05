@@ -1317,16 +1317,16 @@ END DO
 !$OMP END PARALLEL DO
 END SUBROUTINE 
 
-SUBROUTINE update_modified(qold,q,res,adt,rms)
+SUBROUTINE update_modified(qold,q,res,adt,rms,s)
 IMPLICIT NONE
 REAL(kind=8), DIMENSION(4,*) :: qold
 REAL(kind=8), DIMENSION(4,*) :: q
 REAL(kind=8), DIMENSION(4,*) :: res
 REAL(kind=8), DIMENSION(*) :: adt
 REAL(kind=8), DIMENSION(1) :: rms
+integer :: s
 REAL(kind=8) :: del,adti
-INTEGER(kind=4) :: i, j, s
-s = size(adt)
+INTEGER(kind=4) :: i, j
 do j = 1, s
   adti = 1.0 / adt(j)
   DO i = 1, 4
@@ -1350,7 +1350,7 @@ INTEGER(kind=4) :: sliceEnd
 INTEGER(kind=4) :: i1
 integer(8) :: time1, time2, count_rate, count_max
 call system_clock(time1, count_rate, count_max)
-CALL update_modified(opDat1(sliceStart * 4:(sliceEnd - 1) * 4 +3),opDat2(sliceStart * 4:(sliceEnd - 1) * 4 + 3),opDat3(sliceStart * 4:(sliceEnd - 1) * 4 + 3),opDat4(sliceStart * 1:(sliceEnd -1)),opDat5)
+CALL update_modified(opDat1(sliceStart * 4:(sliceEnd - 1) * 4 +3),opDat2(sliceStart * 4:(sliceEnd - 1) * 4 + 3),opDat3(sliceStart * 4:(sliceEnd - 1) * 4 + 3),opDat4(sliceStart * 1:(sliceEnd -1)),opDat5, sliceEnd-sliceStart)
 call system_clock(time2, count_rate, count_max)
 print *, "### update",time2 - time1
 END SUBROUTINE 
