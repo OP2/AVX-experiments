@@ -49,10 +49,11 @@ character(len=4,kind=c_char) :: adtName = 'adt' // C_NULL_CHAR
 character(len=4,kind=c_char) :: resName = 'res' // C_NULL_CHAR
 INTEGER(kind=4) :: debugiter,retDebug
 REAL(kind=8) :: datad
+integer(8) :: time1, time2, count_rate, count_max
 
 real(8) start_time, finish_time, totalExecutionTime
 integer time_array_0(8), time_array_1(8)
-integer(8) :: time1, time2, count_rate, count_max
+integer(8) :: time1t, time2t, count_ratet, count_maxt
   ! read set sizes from input file (input is subdivided in two routines as we cannot allocate arrays in subroutines in
   ! fortran 90)
 PRINT *, "Getting set sizes"
@@ -115,51 +116,74 @@ call initOP2Constants(alpha,cfl,eps,gam,gm1,mach,qinf)
 call date_and_time(values=time_array_0)
 start_time = time_array_0 (5) * 3600 + time_array_0 (6) * 60 &
            + time_array_0 (7) + 0.001 * time_array_0 (8)
-call system_clock(time1, count_rate, count_max)
+call system_clock(time1t, count_ratet, count_max)
     ! main time-marching loop CARLO!!!
 DO niter = 1, iterationNumber
 
 !print *, 'save_soln'
-
+call system_clock(time1, count_rate, count_max)
 CALL save_soln_host("save_soln" // CHAR(0),cells,p_q,-1,OP_ID,OP_READ,p_qold,-1,OP_ID,OP_WRITE)
+call system_clock(time2, count_rate, count_max)
+print *, "### save_soln", time2 - time1
     ! predictor/corrector update loop
 
 !print *, 'adt_calc'
 
 
       ! calculate area/timstep
+call system_clock(time1, count_rate, count_max)
 CALL adt_calc_host("adt_calc" // CHAR(0),cells,p_x,1,pcell,OP_READ,p_x,2,pcell,OP_READ,p_x,3,pcell,OP_READ,p_x,4,pcell,OP_READ,p_q,-1,OP_ID,OP_READ,p_adt,-1,OP_ID,OP_WRITE)
-
+call system_clock(time2, count_rate, count_max)
+print *, "### adt_calc", time2 - time1
 
 !print *, 'res_calc'
 
       ! calculate flux residual
+call system_clock(time1,count_rate, count_max)
 CALL res_calc_host("res_calc" // CHAR(0),edges,p_x,1,pedge,OP_READ,p_x,2,pedge,OP_READ,p_q,1,pecell,OP_READ,p_q,2,pecell,OP_READ,p_adt,1,pecell,OP_READ,p_adt,2,pecell,OP_READ,p_res,1,pecell,OP_INC,p_res,2,pecell,OP_INC)
+call system_clock(time2,count_rate, count_max)
+print *, "### res_calc", time2 - time1
 
-
+call system_clock(time1,count_rate,count_max)
 CALL bres_calc_host("bres_calc" // CHAR(0),bedges,p_x,1,pbedge,OP_READ,p_x,2,pbedge,OP_READ,p_q,1,pbecell,OP_READ,p_adt,1,pbecell,OP_READ,p_res,1,pbecell,OP_INC,p_bound,-1,OP_ID,OP_READ)
+call system_clock(time2, count_rate,count_max)
+print *, "### bres_calc", time2 - time1
       ! update flow field
 rms(1) = 0.0
 
 
+call system_clock(time1, count_rate, count_max)
 CALL update_host("update" // CHAR(0),cells,p_qold,-1,OP_ID,OP_READ,p_q,-1,OP_ID,OP_WRITE,p_res,-1,OP_ID,OP_RW,p_adt,-1,OP_ID,OP_READ,p_rms,-1,OP_GBL,OP_INC)
+call system_clock(time2, count_rate, count_max)
+print *,"### update" ,time2 - time1
 
-
+call system_clock(time1, count_rate, count_max)
 CALL adt_calc_host("adt_calc" // CHAR(0),cells,p_x,1,pcell,OP_READ,p_x,2,pcell,OP_READ,p_x,3,pcell,OP_READ,p_x,4,pcell,OP_READ,p_q,-1,OP_ID,OP_READ,p_adt,-1,OP_ID,OP_WRITE)
+call system_clock(time2, count_rate, count_max)
+print *, "### adt_calc", time2 - time1
 
       ! calculate flux residual
+call system_clock(time1,count_rate, count_max)
 CALL res_calc_host("res_calc" // CHAR(0),edges,p_x,1,pedge,OP_READ,p_x,2,pedge,OP_READ,p_q,1,pecell,OP_READ,p_q,2,pecell,OP_READ,p_adt,1,pecell,OP_READ,p_adt,2,pecell,OP_READ,p_res,1,pecell,OP_INC,p_res,2,pecell,OP_INC)
+call system_clock(time2,count_rate, count_max)
+print *, "### res_calc", time2 - time1
 
+call system_clock(time1,count_rate, count_max)
 CALL bres_calc_host("bres_calc" // CHAR(0),bedges,p_x,1,pbedge,OP_READ,p_x,2,pbedge,OP_READ,p_q,1,pbecell,OP_READ,p_adt,1,pbecell,OP_READ,p_res,1,pbecell,OP_INC,p_bound,-1,OP_ID,OP_READ)
+call system_clock(time2, count_rate,count_max)
+print *, "### bres_calc", time2 - time1
 
 
       ! update flow field
 rms(1) = 0.0
 
-
+call system_clock(time1, count_rate, count_max)
 CALL update_host("update" // CHAR(0),cells,p_qold,-1,OP_ID,OP_READ,p_q,-1,OP_ID,OP_WRITE,p_res,-1,OP_ID,OP_RW,p_adt,-1,OP_ID,OP_READ,p_rms,-1,OP_GBL,OP_INC)
+call system_clock(time2, count_rate, count_max)
+print *,"### update" ,time2 - time1
 
 !!     call op_get_dat ( p_q )
+!RESULT_CHECK
 !      retDebug = openfile ( C_CHAR_"q_avx.txt"//C_NULL_CHAR )
 !      do debugiter = 1, 4*ncell
 !              datad = q(debugiter)
@@ -173,8 +197,8 @@ ncellr = real(ncell)
 rms(1) = sqrt(rms(1) / ncellr)
 IF (mod(niter,100) .EQ. 0) PRINT *, "=====> Iteration result ",rms(1)
 END DO !CARLO!!!
-call system_clock(time2, count_rate, count_max)
-print *, "### ENTIRE TIME", time2 - time1
+call system_clock(time2t, count_ratet, count_maxt)
+print *, "### ENTIRE TIME", time2t - time1t
       call date_and_time(values=time_array_1)
       finish_time = time_array_1 (5) * 3600 + time_array_1 (6) * 60 &
            + time_array_1 (7) + 0.001 * time_array_1 (8)

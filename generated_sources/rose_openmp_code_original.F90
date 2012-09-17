@@ -209,12 +209,9 @@ DO i2 = 0, 2 - 1, 1
 opDat1SharedIndirection(i2 + i1 * 2 + 1) = opDat1(i2 + opDat1IndirectionMap(i1 + 1) * 2)
 END DO
 END DO
-call system_clock(time1, count_rate, count_max)
 DO i1 = 0, numberOfActiveThreads - 1, 1
 CALL adt_calc_modified(opDat1SharedIndirection(1 + mappingArray1(i1 + threadBlockOffset) * 2:1 + mappingArray1(i1 + threadBlockOffset) * 2 + 2 - 1),opDat1SharedIndirection(1 + mappingArray2(i1 + threadBlockOffset) * 2:1 + mappingArray2(i1 + threadBlockOffset) * 2 + 2 - 1),opDat1SharedIndirection(1 + mappingArray3(i1 + threadBlockOffset) * 2:1 + mappingArray3(i1 + threadBlockOffset) * 2 + 2 - 1),opDat1SharedIndirection(1 + mappingArray4(i1 + threadBlockOffset) * 2:1 + mappingArray4(i1 + threadBlockOffset) * 2 + 2 - 1),opDat5((i1 + threadBlockOffset) * 4:(i1 + threadBlockOffset) * 4 + 4 - 1),opDat6((i1 + threadBlockOffset) * 1:(i1 + threadBlockOffset) * 1 + 1 - 1))
 END DO
-call system_clock(time2, count_rate, count_max)
-print *, "### adt_calc", time2 - time1
 END SUBROUTINE 
 
 SUBROUTINE adt_calc_host(userSubroutine,set,opDat1,opIndirection1,opMap1,opAccess1,opDat2,opIndirection2,opMap2,opAccess2,opDat3,opIndirection3,opMap3,opAccess3,opDat4,opIndirection4,opMap4,opAccess4,opDat5,opIndirection5,opMap5,opAccess5,opDat6,opIndirection6,opMap6,opAccess6)
@@ -561,10 +558,7 @@ IF (i1 < numberOfActiveThreads) THEN
 DO i2 = 0, 4 - 1, 1
 opDat5Local(i2) = 0
 END DO
-call system_clock(time1, count_rate, count_max)
 CALL bres_calc_modified(opDat1SharedIndirection(1 + mappingArray1(i1 + threadBlockOffset) * 2:1 + mappingArray1(i1 + threadBlockOffset) * 2 + 2 - 1),opDat1SharedIndirection(1 + mappingArray2(i1 + threadBlockOffset) * 2:1 + mappingArray2(i1 + threadBlockOffset) * 2 + 2 - 1),opDat3SharedIndirection(1 + mappingArray3(i1 + threadBlockOffset) * 4:1 + mappingArray3(i1 + threadBlockOffset) * 4 + 4 - 1),opDat4SharedIndirection(1 + mappingArray4(i1 + threadBlockOffset) * 1:1 + mappingArray4(i1 + threadBlockOffset) * 1 + 1 - 1),opDat5Local,opDat6((i1 + threadBlockOffset) * 1:(i1 + threadBlockOffset) * 1 + 1 - 1))
-call system_clock(time2, count_rate, count_max)
-acc = acc + (time2 - time1) 
 colour2 = thrcol(i1 + threadBlockOffset)
 END IF
 opDat5Map = mappingArray5(i1 + threadBlockOffset)
@@ -576,7 +570,6 @@ END DO
 END IF
 END DO
 END DO
-print *, "### bres_calc", acc
 DO i1 = 0, opDat5SharedIndirectionSize - 1, 1
 DO i2 = 0, 4 - 1, 1
 opDat5(i2 + opDat5IndirectionMap(i1 + 1) * 4) = opDat5(i2 + opDat5IndirectionMap(i1 + 1) * 4) + opDat5SharedIndirection(1 + (i2 + i1 * 4))
@@ -954,10 +947,7 @@ END DO
 DO i2 = 0, 4 - 1, 1
 opDat8Local(i2) = 0
 END DO
-call system_clock(time1, count_rate, count_max)
 CALL res_calc_modified(opDat1SharedIndirection(1 + mappingArray1(i1 + threadBlockOffset) * 2:1 + mappingArray1(i1 + threadBlockOffset) * 2 + 2 - 1),opDat1SharedIndirection(1 + mappingArray2(i1 + threadBlockOffset) * 2:1 + mappingArray2(i1 + threadBlockOffset) * 2 + 2 - 1),opDat3SharedIndirection(1 + mappingArray3(i1 + threadBlockOffset) * 4:1 + mappingArray3(i1 + threadBlockOffset) * 4 + 4 - 1),opDat3SharedIndirection(1 + mappingArray4(i1 + threadBlockOffset) * 4:1 + mappingArray4(i1 + threadBlockOffset) * 4 + 4 - 1),opDat5SharedIndirection(1 + mappingArray5(i1 + threadBlockOffset) * 1:1 + mappingArray5(i1 + threadBlockOffset) * 1 + 1 - 1),opDat5SharedIndirection(1 + mappingArray6(i1 + threadBlockOffset) * 1:1 + mappingArray6(i1 + threadBlockOffset) * 1 + 1 - 1),opDat7Local,opDat8Local)
-call system_clock(time2, count_rate, count_max)
-acc = acc + (time2 - time1)
 colour2 = thrcol(i1 + threadBlockOffset)
 END IF
 opDat7Map = mappingArray7(i1 + threadBlockOffset)
@@ -973,7 +963,6 @@ END DO
 END IF
 END DO
 END DO
-print *, "### res_calc", acc
 DO i1 = 0, opDat7SharedIndirectionSize - 1, 1
 DO i2 = 0, 4 - 1, 1
 opDat7(i2 + opDat7IndirectionMap(i1 + 1) * 4) = opDat7(i2 + opDat7IndirectionMap(i1 + 1) * 4) + opDat7SharedIndirection(1 + (i2 + i1 * 4))
@@ -1261,10 +1250,7 @@ INTEGER(kind=4) :: sliceStart
 INTEGER(kind=4) :: sliceEnd
 INTEGER(kind=4) :: i1
 integer(8) :: time1, time2, count_rate, count_max
-call system_clock(time1, count_rate, count_max)
 CALL save_soln_modified(opDat1(sliceStart * 4:(sliceEnd - 1)  * 4 + 3), opDat2(sliceStart * 4:(sliceEnd-1) * 4 + 3),sliceEnd - sliceStart)
-call system_clock(time2, count_rate, count_max)
-print *, "### save_soln",time2 - time1
 END SUBROUTINE 
 
 SUBROUTINE save_soln_host(userSubroutine,set,opDat1,opIndirection1,opMap1,opAccess1,opDat2,opIndirection2,opMap2,opAccess2)
@@ -1350,10 +1336,7 @@ INTEGER(kind=4) :: sliceStart
 INTEGER(kind=4) :: sliceEnd
 INTEGER(kind=4) :: i1
 integer(8) :: time1, time2, count_rate, count_max
-call system_clock(time1, count_rate, count_max)
 CALL update_modified(opDat1(sliceStart * 4:(sliceEnd - 1) * 4 +3),opDat2(sliceStart * 4:(sliceEnd - 1) * 4 + 3),opDat3(sliceStart * 4:(sliceEnd - 1) * 4 + 3),opDat4(sliceStart * 1:(sliceEnd -1)),opDat5, sliceEnd-sliceStart)
-call system_clock(time2, count_rate, count_max)
-print *, "### update",time2 - time1
 END SUBROUTINE 
 
 SUBROUTINE update_host(userSubroutine,set,opDat1,opIndirection1,opMap1,opAccess1,opDat2,opIndirection2,opMap2,opAccess2,opDat3,opIndirection3,opMap3,opAccess3,opDat4,opIndirection4,opMap4,opAccess4,opDat5,opIndirection5,opMap5,opAccess5)

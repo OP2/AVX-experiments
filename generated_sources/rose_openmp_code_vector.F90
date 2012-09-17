@@ -191,6 +191,7 @@ INTEGER(kind=4) :: threadBlockID
 INTEGER(kind=4) :: numberOfActiveThreads
 INTEGER(kind=4) :: i1
 INTEGER(kind=4) :: i2
+INTEGER(kind=4) :: i3
 INTEGER(kind=4), POINTER, DIMENSION(:) :: opDat1IndirectionMap
 REAL(kind=8), POINTER, DIMENSION(:) :: opDat1SharedIndirection
 REAL(kind=8), DIMENSION(0:8000 - 1), TARGET :: sharedFloat8
@@ -199,17 +200,10 @@ INTEGER(kind=4) :: opDat1RoundUp
 INTEGER(kind=4) :: opDat1SharedIndirectionSize
 integer(8) :: time1, time2, count_rate, count_max
 integer(8) :: time1g, time2g, count_rateg, count_maxg
-real(kind=8), allocatable, dimension(:) :: arg1, arg2, arg3, arg4, arg5
+real(kind=8), dimension(0:BS - 1, 2) :: arg1, arg2, arg3, arg4
+real(kind=8), dimension(0:BS - 1, 4) :: arg5
 threadBlockID = blkmap(blockID + blockOffset)
 numberOfActiveThreads = nelems(threadBlockID)
-call system_clock(time1, count_rate, count_max)
-allocate (arg1(numberOfActiveThreads*2))
-allocate (arg2(numberOfActiveThreads*2))
-allocate (arg3(numberOfActiveThreads*2))
-allocate (arg4(numberOfActiveThreads*2))
-allocate (arg5(numberOfActiveThreads*4))
-call system_clock(time2, count_rate, count_max)
-print *, "### not counted"
 threadBlockOffset = offset(threadBlockID)
 opDat1SharedIndirectionSize = ind_sizes(0 + threadBlockID * 1)
 opDat1IndirectionMap => ind_maps1(ind_offs(0 + threadBlockID * 1):)
@@ -220,76 +214,49 @@ DO i2 = 0, 2 - 1, 1
 opDat1SharedIndirection(i2 + i1 * 2 + 1) = opDat1(i2 + opDat1IndirectionMap(i1 + 1) * 2)
 END DO
 END DO
-call system_clock(time1, count_rate, count_max)
-call mkl_domatcopy('r', 't', numberOfActiveThreads, 4, 1.d0, opDat5(4*threadBlockOffset:4*(numberOfActiveThreads-1+threadBlockOffset) + 3), 4, arg5, numberOfActiveThreads)
-call system_clock(time2, count_rate, count_max)
-print *, "### not counted"
-call system_clock(time1g, count_rateg, count_maxg)
-DO i1 = 0, numberOfActiveThreads - 1, 1
-arg1(i1 + 1) = opDat1SharedIndirection(1 + mappingArray1(i1 + threadBlockOffset) * 2)
-arg1(i1 + numberOfActiveThreads + 1) = opDat1SharedIndirection(1 + mappingArray1(i1 + threadBlockOffset) * 2 + 1)
-arg2(i1 + 1) = opDat1SharedIndirection(1 + mappingArray2(i1 + threadBlockOffset) * 2)
-arg2(i1 + numberOfActiveThreads + 1) = opDat1SharedIndirection(1 + mappingArray2(i1 + threadBlockOffset) * 2 + 1)
-arg3(i1 + 1) = opDat1SharedIndirection(1 + mappingArray3(i1 + threadBlockOffset) * 2)
-arg3(i1 + numberOfActiveThreads + 1) = opDat1SharedIndirection(1 + mappingArray3(i1 + threadBlockOffset) * 2 + 1)
-arg4(i1 + 1) = opDat1SharedIndirection(1 + mappingArray4(i1 + threadBlockOffset) * 2)
-arg4(i1 + numberOfActiveThreads + 1) = opDat1SharedIndirection(1 + mappingArray4(i1 + threadBlockOffset) * 2 + 1)
-END DO
-call system_clock(time1, count_rate, count_max)
-call adt_calc_kernel_caller(arg1,arg2,arg3,arg4,arg5,opDat6(threadBlockOffset:threadBlockOffset+numberOfActiveThreads-1), numberOfActiveThreads)
-call system_clock(time2, count_rate, count_max)
-print *, "### adt_calc", time2 - time1
-DO i1 = 0, numberOfActiveThreads - 1, 1
-opDat1SharedIndirection(1 + mappingArray1(i1 + threadBlockOffset) * 2) = arg1(i1 + 1) 
-opDat1SharedIndirection(1 + mappingArray1(i1 + threadBlockOffset) * 2 + 1) = arg1(i1 + numberOfActiveThreads + 1)
-opDat1SharedIndirection(1 + mappingArray2(i1 + threadBlockOffset) * 2) = arg2(i1 + 1)
-opDat1SharedIndirection(1 + mappingArray2(i1 + threadBlockOffset) * 2 + 1) = arg2(i1 + numberOfActiveThreads + 1)
-opDat1SharedIndirection(1 + mappingArray3(i1 + threadBlockOffset) * 2) = arg3(i1 + 1) 
-opDat1SharedIndirection(1 + mappingArray3(i1 + threadBlockOffset) * 2 + 1) = arg3(i1 + numberOfActiveThreads + 1)
-opDat1SharedIndirection(1 + mappingArray4(i1 + threadBlockOffset) * 2) = arg4(i1 + 1)
-opDat1SharedIndirection(1 + mappingArray4(i1 + threadBlockOffset) * 2 + 1) = arg4(i1 + numberOfActiveThreads + 1) 
-END DO
-call system_clock(time2g, count_rateg, count_maxg)
-print *, "### adt_gather", time2g - time1g
-call system_clock(time1, count_rate, count_max)
-call mkl_domatcopy('r', 't', 4, numberOfActiveThreads, 1.d0, arg5, numberOfActiveThreads, opDat5(4*threadBlockOffset:4*(numberOfActiveThreads-1+threadBlockOffset) + 3), 4)
-call system_clock(time2, count_rate, count_max)
-print *, "### not counted", time2 - time1
-deallocate (arg1)
-deallocate (arg2)
-deallocate (arg3)
-deallocate (arg4)
-deallocate (arg5)
+do i1 = 0, numberOfActiveThreads - 1, BS
+  do i2 = 0, BS - 1
+    arg1(i2, :) = opDat1SharedIndirection(1 + mappingArray1(i1 + i2 + threadBlockOffset) * 2 : 1 + mappingArray1(i1 + i2 + threadBlockOffset) * 2 + 1)
+    arg2(i2, :) = opDat1SharedIndirection(1 + mappingArray2(i1 + i2 + threadBlockOffset) * 2 : 1 + mappingArray2(i1 + i2 + threadBlockOffset) * 2 + 1)
+    arg3(i2, :) = opDat1SharedIndirection(1 + mappingArray3(i1 + i2 + threadBlockOffset) * 2 : 1 + mappingArray3(i1 + i2 + threadBlockOffset) * 2 + 1)
+    arg4(i2, :) = opDat1SharedIndirection(1 + mappingArray4(i1 + i2 + threadBlockOffset) * 2 : 1 + mappingArray4(i1 + i2 + threadBlockOffset) * 2 + 1)
+    arg5(i2, :) = opDat5(4 * (i1 + i2 + threadBlockOffset) : 4 * (i1 + i2 + threadBlockOffset) + 3)
+  end do
+  call adt_calc_kernel_vector(arg1, arg2, arg3, arg4, arg5, opDat6(threadBlockOffset + i1: threadBlockOffset + i1 + BS - 1))
+  do i2 = 0, BS - 1
+    opDat1SharedIndirection(1 + mappingArray1(i1 + i2 + threadBlockOffset) * 2 : 1 + mappingArray1(i1 + i2 + threadBlockOffset) * 2 + 1) = arg1(i2, :)
+    opDat1SharedIndirection(1 + mappingArray2(i1 + i2 + threadBlockOffset) * 2 : 1 + mappingArray2(i1 + i2 + threadBlockOffset) * 2 + 1) = arg2(i2, :)
+    opDat1SharedIndirection(1 + mappingArray3(i1 + i2 + threadBlockOffset) * 2 : 1 + mappingArray3(i1 + i2 + threadBlockOffset) * 2 + 1) = arg3(i2, :)
+    opDat1SharedIndirection(1 + mappingArray4(i1 + i2 + threadBlockOffset) * 2 : 1 + mappingArray4(i1 + i2 + threadBlockOffset) * 2 + 1) = arg4(i2, :)
+    opDat5(4 * (i1 + i2 + threadBlockOffset) : 4 * (i1 + i2 + threadBlockOffset) + 3) = arg5(i2, :)
+  end do
+end do
 END SUBROUTINE 
 
-subroutine adt_calc_kernel_caller(x1, x2, x3, x4, q, adt, iterations)
-
+subroutine adt_calc_kernel_vector(x1, x2, x3, x4, q, adt)
   implicit none
-  real(kind=8), dimension(BS, iterations/BS, 2) :: x1, x2, x3, x4
-  real(kind=8), dimension(BS, iterations/BS, 4) :: q
-  real(kind=8), dimension(BS, iterations/BS) :: adt
-  integer :: iterations
+  real(kind=8), dimension(BS, 2) :: x1, x2, x3, x4
+  real(kind=8), dimension(BS, 4) :: q
+  real(kind=8), dimension(BS) :: adt
   integer :: i
   REAL(kind=8), dimension(BS) :: dx,dy,ri,u,v,c
-  do i = 1, iterations/BS
-    ri(:) = 1.0 / q(:, i, 1)
-    u(:) = ri(:) * q(:, i, 2)
-    v(:) = ri(:) * q(:, i, 3)
-    c(:) = sqrt(gam_OP2_CONSTANT * gm1_OP2_CONSTANT * (ri(:) * q(:, i, 4) - 0.5 * (u(:) * u(:) + v(:) * v(:))))
-    dx(:) = x2(:, i, 1) - x1(:, i, 1)
-    dy(:) = x2(:, i, 2) - x1(:, i, 2)
-    adt(:,i) = abs(u(:) * dy(:) - v(:) * dx(:)) + c(:) * sqrt(dx(:) * dx(:) + dy(:) * dy(:))
-    dx(:) = x3(:, i, 1) - x2(:, i, 1)
-    dy(:) = x3(:, i, 2) - x2(:, i, 2)
-    adt(:,i) = adt(:,i) + abs(u(:) * dy(:) - v(:) * dx(:)) + c(:) * sqrt(dx(:) * dx(:) + dy(:) * dy(:))
-    dx(:) = x4(:, i, 1) - x3(:, i, 1)
-    dy(:) = x4(:, i, 2) - x3(:, i, 2)
-    adt(:,i) = adt(:,i) + abs(u(:) * dy(:) - v(:) * dx(:)) + c(:) * sqrt(dx(:) * dx(:) + dy(:) * dy(:))
-    dx(:) = x1(:, i, 1) - x4(:, i, 1)
-    dy(:) = x1(:, i, 2) - x4(:, i, 2)
-    adt(:,i) = adt(:,i) + abs(u(:) * dy(:) - v(:) * dx(:)) + c(:) * sqrt(dx(:) * dx(:) + dy(:) * dy(:))
-    adt(:,i) = adt(:,i) / cfl_OP2_CONSTANT
-  end do
+  ri(:) = 1.0 / q(:, 1)
+  u(:) = ri(:) * q(:, 2)
+  v(:) = ri(:) * q(:, 3)
+  c(:) = sqrt(gam_OP2_CONSTANT * gm1_OP2_CONSTANT * (ri(:) * q(:, 4) - 0.5 * (u(:) * u(:) + v(:) * v(:))))
+  dx(:) = x2(:, 1) - x1(:, 1)
+  dy(:) = x2(:, 2) - x1(:, 2)
+  adt(:) = abs(u(:) * dy(:) - v(:) * dx(:)) + c(:) * sqrt(dx(:) * dx(:) + dy(:) * dy(:))
+  dx(:) = x3(:, 1) - x2(:, 1)
+  dy(:) = x3(:, 2) - x2(:, 2)
+  adt(:) = adt(:) + abs(u(:) * dy(:) - v(:) * dx(:)) + c(:) * sqrt(dx(:) * dx(:) + dy(:) * dy(:))
+  dx(:) = x4(:, 1) - x3(:, 1)
+  dy(:) = x4(:, 2) - x3(:, 2)
+  adt(:) = adt(:) + abs(u(:) * dy(:) - v(:) * dx(:)) + c(:) * sqrt(dx(:) * dx(:) + dy(:) * dy(:))
+  dx(:) = x1(:, 1) - x4(:, 1)
+  dy(:) = x1(:, 2) - x4(:, 2)
+  adt(:) = adt(:) + abs(u(:) * dy(:) - v(:) * dx(:)) + c(:) * sqrt(dx(:) * dx(:) + dy(:) * dy(:))
+  adt(:) = adt(:) / cfl_OP2_CONSTANT
 end subroutine
 
 SUBROUTINE adt_calc_host(userSubroutine,set,opDat1,opIndirection1,opMap1,opAccess1,opDat2,opIndirection2,opMap2,opAccess2,opDat3,opIndirection3,opMap3,opAccess3,opDat4,opIndirection4,opMap4,opAccess4,opDat5,opIndirection5,opMap5,opAccess5,opDat6,opIndirection6,opMap6,opAccess6)
@@ -526,169 +493,41 @@ res1(4) = res1(4) + f
 END IF
 END SUBROUTINE 
 
-SUBROUTINE bres_calc_kernel_caller(x1,x2,q1,adt1,res1,bound,iterations)
+
+SUBROUTINE bres_calc_kernel_vector(x1,x2,q1,adt1,res1,bound)
 IMPLICIT NONE
-integer :: iterations
-REAL(kind=8), DIMENSION(BS, iterations/BS, 2) :: x1, x2
-REAL(kind=8), DIMENSION(BS, iterations/BS, 4) :: q1
-REAL(kind=8), DIMENSION(BS, iterations/BS) :: adt1
-REAL(kind=8), DIMENSION(BS, iterations/BS, 4) :: res1
-INTEGER(kind=4), DIMENSION(BS, iterations/BS) :: bound
+REAL(kind=8), DIMENSION(BS, 2) :: x1, x2
+REAL(kind=8), DIMENSION(BS, 4) :: q1
+REAL(kind=8), DIMENSION(BS) :: adt1
+REAL(kind=8), DIMENSION(BS, 4) :: res1
+INTEGER(kind=4), DIMENSION(BS) :: bound
 REAL(kind=8), DIMENSION(BS) :: dx,dy,mu,ri,p1,vol1,p2,vol2,f
-integer :: i,j
-do i = 1, iterations/BS
-  do j = 1, BS
-    dx(j) = x1(j, i, 1) - x2(j, i, 1)
-    dy(j) = x1(j, i, 2) - x2(j, i, 2)
-    ri(j) = 1.0 / q1(j, i, 1)
-    p1(j) = gm1_OP2_CONSTANT * (q1(j, i, 4) - 0.5 * ri(j) * (q1(j, i, 2) * q1(j, i, 2) + q1(j, i, 3) * q1(j, i, 3)))
-    IF (bound(j, i) .EQ. 1) THEN
-      res1(j, i, 2) = res1(j, i, 2) + p1(j) * dy(j)
-      res1(j, i, 3) = res1(j, i, 3) + -(p1(j) * dx(j))
-    ELSE
-      vol1(j) = ri(j) * (q1(j, i, 2) * dy(j) - q1(j, i, 3) * dx(j))
-      ri(j) = 1.0 / qinf_OP2_CONSTANT(1)
-      p2(j) = gm1_OP2_CONSTANT * (qinf_OP2_CONSTANT(4) - 0.5 * ri(j) * (qinf_OP2_CONSTANT(2) * qinf_OP2_CONSTANT(2) + qinf_OP2_CONSTANT(3) * qinf_OP2_CONSTANT(3)))
-      vol2(j) = ri(j) * (qinf_OP2_CONSTANT(2) * dy(j) - qinf_OP2_CONSTANT(3) * dx(j))
-      mu(j) = adt1(j, i) * eps_OP2_CONSTANT
-      f(j) = 0.5 * (vol1(j) * q1(j, i, 1) + vol2(j) * qinf_OP2_CONSTANT(1)) + mu(j) * (q1(j, i, 1) - qinf_OP2_CONSTANT(1))
-      res1(j, i, 1) = res1(j, i, 1) + f(j)
-      f(j) = 0.5 * (vol1(j) * q1(j, i, 2) + p1(j) * dy(j) + vol2(j) * qinf_OP2_CONSTANT(2) + p2(j) * dy(j)) + mu(j) * (q1(j, i, 2) - qinf_OP2_CONSTANT(2))
-      res1(j, i, 2) = res1(j, i, 2) + f(j)
-      f(j) = 0.5 * (vol1(j) * q1(j, i, 3) - p1(j) * dx(j) + vol2(j) * qinf_OP2_CONSTANT(3) - p2(j) * dx(j)) + mu(j) * (q1(j, i, 3) - qinf_OP2_CONSTANT(3))
-      res1(j, i, 3) = res1(j, i, 3) + f(j)
-      f(j) = 0.5 * (vol1(j) * (q1(j, i, 4) + p1(j)) + vol2(j) * (qinf_OP2_CONSTANT(4) + p2(j))) + mu(j) * (q1(j, i, 4) - qinf_OP2_CONSTANT(4))
-      res1(j, i, 4) = res1(j, i, 4) + f(j)
-    END IF
-  end do
+integer :: j 
+do j = 1, BS
+  dx(j) = x1(j, 1) - x2(j, 1)
+  dy(j) = x1(j, 2) - x2(j, 2)
+  ri(j) = 1.0 / q1(j, 1)
+  p1(j) = gm1_OP2_CONSTANT * (q1(j, 4) - 0.5 * ri(j) * (q1(j, 2) * q1(j, 2) + q1(j, 3) * q1(j, 3)))
+  IF (bound(j) .EQ. 1) THEN
+    res1(j, 2) = res1(j, 2) + p1(j) * dy(j)
+    res1(j, 3) = res1(j, 3) + -(p1(j) * dx(j))
+  ELSE
+    vol1(j) = ri(j) * (q1(j, 2) * dy(j) - q1(j, 3) * dx(j))
+    ri(j) = 1.0 / qinf_OP2_CONSTANT(1)
+    p2(j) = gm1_OP2_CONSTANT * (qinf_OP2_CONSTANT(4) - 0.5 * ri(j) * (qinf_OP2_CONSTANT(2) * qinf_OP2_CONSTANT(2) + qinf_OP2_CONSTANT(3) * qinf_OP2_CONSTANT(3)))
+    vol2(j) = ri(j) * (qinf_OP2_CONSTANT(2) * dy(j) - qinf_OP2_CONSTANT(3) * dx(j))
+    mu(j) = adt1(j) * eps_OP2_CONSTANT
+    f(j) = 0.5 * (vol1(j) * q1(j, 1) + vol2(j) * qinf_OP2_CONSTANT(1)) + mu(j) * (q1(j, 1) - qinf_OP2_CONSTANT(1))
+    res1(j, 1) = res1(j, 1) + f(j)
+    f(j) = 0.5 * (vol1(j) * q1(j, 2) + p1(j) * dy(j) + vol2(j) * qinf_OP2_CONSTANT(2) + p2(j) * dy(j)) + mu(j) * (q1(j, 2) - qinf_OP2_CONSTANT(2))
+    res1(j, 2) = res1(j, 2) + f(j)
+    f(j) = 0.5 * (vol1(j) * q1(j, 3) - p1(j) * dx(j) + vol2(j) * qinf_OP2_CONSTANT(3) - p2(j) * dx(j)) + mu(j) * (q1(j, 3) - qinf_OP2_CONSTANT(3))
+    res1(j, 3) = res1(j, 3) + f(j)
+    f(j) = 0.5 * (vol1(j) * (q1(j, 4) + p1(j)) + vol2(j) * (qinf_OP2_CONSTANT(4) + p2(j))) + mu(j) * (q1(j, 4) - qinf_OP2_CONSTANT(4))
+    res1(j, 4) = res1(j, 4) + f(j)
+  END IF
 end do
 END SUBROUTINE 
-
-!SUBROUTINE bres_calc_kernel(opDat1,opDat3,opDat4,opDat5,opDat6,ind_maps1,ind_maps3,ind_maps4,ind_maps5,mappingArray1,mappingArray2,mappingArray3,mappingArray4,mappingArray5,ind_sizes,ind_offs,blkmap,offset,nelems,nthrcol,thrcol,blockOffset,blockID)
-!IMPLICIT NONE
-!REAL(kind=8), DIMENSION(0:*) :: opDat1
-!REAL(kind=8), DIMENSION(0:*) :: opDat3
-!REAL(kind=8), DIMENSION(0:*) :: opDat4
-!REAL(kind=8), DIMENSION(0:*) :: opDat5
-!INTEGER(kind=4), DIMENSION(0:*) :: opDat6
-!INTEGER(kind=4), DIMENSION(0:), TARGET :: ind_maps1
-!INTEGER(kind=4), DIMENSION(0:), TARGET :: ind_maps3
-!INTEGER(kind=4), DIMENSION(0:), TARGET :: ind_maps4
-!INTEGER(kind=4), DIMENSION(0:), TARGET :: ind_maps5
-!INTEGER(kind=2), DIMENSION(0:*) :: mappingArray1
-!INTEGER(kind=2), DIMENSION(0:*) :: mappingArray2
-!INTEGER(kind=2), DIMENSION(0:*) :: mappingArray3
-!INTEGER(kind=2), DIMENSION(0:*) :: mappingArray4
-!INTEGER(kind=2), DIMENSION(0:*) :: mappingArray5
-!INTEGER(kind=4), DIMENSION(0:*) :: ind_sizes
-!INTEGER(kind=4), DIMENSION(0:*) :: ind_offs
-!INTEGER(kind=4), DIMENSION(0:*) :: blkmap
-!INTEGER(kind=4), DIMENSION(0:*) :: offset
-!INTEGER(kind=4), DIMENSION(0:*) :: nelems
-!INTEGER(kind=4), DIMENSION(0:*) :: nthrcol
-!INTEGER(kind=4), DIMENSION(0:*) :: thrcol
-!INTEGER(kind=4) :: blockOffset
-!INTEGER(kind=4) :: blockID
-!INTEGER(kind=4) :: threadBlockOffset
-!INTEGER(kind=4) :: threadBlockID
-!INTEGER(kind=4) :: numberOfActiveThreads
-!INTEGER(kind=4) :: i1
-!INTEGER(kind=4) :: i2
-!INTEGER(kind=4), POINTER, DIMENSION(:) :: opDat1IndirectionMap
-!REAL(kind=8), POINTER, DIMENSION(:) :: opDat1SharedIndirection
-!REAL(kind=8), DIMENSION(0:8000 - 1), TARGET :: sharedFloat8
-!INTEGER(kind=4), POINTER, DIMENSION(:) :: opDat3IndirectionMap
-!REAL(kind=8), POINTER, DIMENSION(:) :: opDat3SharedIndirection
-!INTEGER(kind=4), POINTER, DIMENSION(:) :: opDat4IndirectionMap
-!REAL(kind=8), POINTER, DIMENSION(:) :: opDat4SharedIndirection
-!INTEGER(kind=4), POINTER, DIMENSION(:) :: opDat5IndirectionMap
-!REAL(kind=8), POINTER, DIMENSION(:) :: opDat5SharedIndirection
-!INTEGER(kind=4) :: opDat1nBytes
-!INTEGER(kind=4) :: opDat3nBytes
-!INTEGER(kind=4) :: opDat4nBytes
-!INTEGER(kind=4) :: opDat5nBytes
-!INTEGER(kind=4) :: opDat1RoundUp
-!INTEGER(kind=4) :: opDat3RoundUp
-!INTEGER(kind=4) :: opDat4RoundUp
-!INTEGER(kind=4) :: opDat5RoundUp
-!INTEGER(kind=4) :: opDat1SharedIndirectionSize
-!INTEGER(kind=4) :: opDat3SharedIndirectionSize
-!INTEGER(kind=4) :: opDat4SharedIndirectionSize
-!INTEGER(kind=4) :: opDat5SharedIndirectionSize
-!REAL(kind=8), DIMENSION(0:3) :: opDat5Local
-!INTEGER(kind=4) :: opDat5Map
-!INTEGER(kind=4) :: numOfColours
-!INTEGER(kind=4) :: numberOfActiveThreadsCeiling
-!INTEGER(kind=4) :: colour1
-!INTEGER(kind=4) :: colour2
-!threadBlockID = blkmap(blockID + blockOffset)
-!numberOfActiveThreads = nelems(threadBlockID)
-!threadBlockOffset = offset(threadBlockID)
-!numberOfActiveThreadsCeiling = numberOfActiveThreads
-!numOfColours = nthrcol(threadBlockID)
-!opDat1SharedIndirectionSize = ind_sizes(0 + threadBlockID * 4)
-!opDat3SharedIndirectionSize = ind_sizes(1 + threadBlockID * 4)
-!opDat4SharedIndirectionSize = ind_sizes(2 + threadBlockID * 4)
-!opDat5SharedIndirectionSize = ind_sizes(3 + threadBlockID * 4)
-!opDat1IndirectionMap => ind_maps1(ind_offs(0 + threadBlockID * 4):)
-!opDat3IndirectionMap => ind_maps3(ind_offs(1 + threadBlockID * 4):)
-!opDat4IndirectionMap => ind_maps4(ind_offs(2 + threadBlockID * 4):)
-!opDat5IndirectionMap => ind_maps5(ind_offs(3 + threadBlockID * 4):)
-!opDat3RoundUp = opDat1SharedIndirectionSize * 2
-!opDat4RoundUp = opDat3SharedIndirectionSize * 4
-!opDat5RoundUp = opDat4SharedIndirectionSize * 1
-!opDat1nBytes = 0
-!opDat3nBytes = opDat1nBytes + opDat3RoundUp
-!opDat4nBytes = opDat3nBytes + opDat4RoundUp
-!opDat5nBytes = opDat4nBytes + opDat5RoundUp
-!opDat1SharedIndirection => sharedFloat8(opDat1nBytes:)
-!opDat3SharedIndirection => sharedFloat8(opDat3nBytes:)
-!opDat4SharedIndirection => sharedFloat8(opDat4nBytes:)
-!opDat5SharedIndirection => sharedFloat8(opDat5nBytes:)
-!DO i1 = 0, opDat1SharedIndirectionSize - 1, 1
-!DO i2 = 0, 2 - 1, 1
-!opDat1SharedIndirection(i2 + i1 * 2 + 1) = opDat1(i2 + opDat1IndirectionMap(i1 + 1) * 2)
-!END DO
-!END DO
-!DO i1 = 0, opDat3SharedIndirectionSize - 1, 1
-!DO i2 = 0, 4 - 1, 1
-!opDat3SharedIndirection(i2 + i1 * 4 + 1) = opDat3(i2 + opDat3IndirectionMap(i1 + 1) * 4)
-!END DO
-!END DO
-!DO i1 = 0, opDat4SharedIndirectionSize - 1, 1
-!DO i2 = 0, 1 - 1, 1
-!opDat4SharedIndirection(i2 + i1 * 1 + 1) = opDat4(i2 + opDat4IndirectionMap(i1 + 1) * 1)
-!END DO
-!END DO
-!DO i1 = 0, opDat5SharedIndirectionSize - 1, 1
-!DO i2 = 0, 4 - 1, 1
-!opDat5SharedIndirection(i2 + i1 * 4 + 1) = 0
-!END DO
-!END DO
-!DO i1 = 0, numberOfActiveThreadsCeiling - 1, 1
-!colour2 = -1
-!IF (i1 < numberOfActiveThreads) THEN
-!DO i2 = 0, 4 - 1, 1
-!opDat5Local(i2) = 0
-!END DO
-!CALL bres_calc_modified(opDat1SharedIndirection(1 + mappingArray1(i1 + threadBlockOffset) * 2:1 + mappingArray1(i1 + threadBlockOffset) * 2 + 2 - 1),opDat1SharedIndirection(1 + mappingArray2(i1 + threadBlockOffset) * 2:1 + mappingArray2(i1 + threadBlockOffset) * 2 + 2 - 1),opDat3SharedIndirection(1 + mappingArray3(i1 + threadBlockOffset) * 4:1 + mappingArray3(i1 + threadBlockOffset) * 4 + 4 - 1),opDat4SharedIndirection(1 + mappingArray4(i1 + threadBlockOffset) * 1:1 + mappingArray4(i1 + threadBlockOffset) * 1 + 1 - 1),opDat5Local,opDat6((i1 + threadBlockOffset) * 1:(i1 + threadBlockOffset) * 1 + 1 - 1))
-!colour2 = thrcol(i1 + threadBlockOffset)
-!END IF
-!opDat5Map = mappingArray5(i1 + threadBlockOffset)
-!DO colour1 = 0, numOfColours - 1, 1
-!IF (colour2 .EQ. colour1) THEN
-!DO i2 = 0, 4 - 1, 1
-!opDat5SharedIndirection(1 + (i2 + opDat5Map * 4)) = opDat5SharedIndirection(1 + (i2 + opDat5Map * 4)) + opDat5Local(i2)
-!END DO
-!END IF
-!END DO
-!END DO
-!DO i1 = 0, opDat5SharedIndirectionSize - 1, 1
-!DO i2 = 0, 4 - 1, 1
-!opDat5(i2 + opDat5IndirectionMap(i1 + 1) * 4) = opDat5(i2 + opDat5IndirectionMap(i1 + 1) * 4) + opDat5SharedIndirection(1 + (i2 + i1 * 4))
-!END DO
-!END DO
-!END SUBROUTINE 
 
 SUBROUTINE bres_calc_kernel(opDat1,opDat3,opDat4,opDat5,opDat6,ind_maps1,ind_maps3,ind_maps4,ind_maps5,mappingArray1,mappingArray2,mappingArray3,mappingArray4,mappingArray5,ind_sizes,ind_offs,blkmap,offset,nelems,nthrcol,thrcol,blockOffset,blockID)
 IMPLICIT NONE
@@ -720,6 +559,7 @@ INTEGER(kind=4) :: threadBlockID
 INTEGER(kind=4) :: numberOfActiveThreads
 INTEGER(kind=4) :: i1
 INTEGER(kind=4) :: i2
+INTEGER(kind=4) :: i3
 INTEGER(kind=4), POINTER, DIMENSION(:) :: opDat1IndirectionMap
 REAL(kind=8), POINTER, DIMENSION(:) :: opDat1SharedIndirection
 REAL(kind=8), DIMENSION(0:8000 - 1), TARGET :: sharedFloat8
@@ -747,18 +587,14 @@ INTEGER(kind=4) :: numOfColours
 INTEGER(kind=4) :: numberOfActiveThreadsCeiling
 INTEGER(kind=4) :: colour1
 INTEGER(kind=4) :: colour2
-integer(8) :: time1, time2, count_rate, count_max
-integer(8) :: time1g, time2g, count_rateg, count_maxg
-real(kind=8), allocatable, dimension(:) :: arg1, arg2, arg3, arg4, arg5
+real(kind=8), dimension(0:BS - 1, 2) :: arg1, arg2
+real(kind=8), dimension(0:BS - 1, 4) ::arg3
+real(kind=8), dimension(BS, 4) :: arg5
+real(kind=8), dimension(0:BS - 1) :: arg4
 threadBlockID = blkmap(blockID + blockOffset)
 numberOfActiveThreads = nelems(threadBlockID)
 threadBlockOffset = offset(threadBlockID)
 numberOfActiveThreadsCeiling = numberOfActiveThreads
-allocate (arg1(numberOfActiveThreads*2))
-allocate (arg2(numberOfActiveThreads*2))
-allocate (arg3(numberOfActiveThreads*4))
-allocate (arg4(numberOfActiveThreads))
-allocate (arg5(numberOfActiveThreads*4))
 numOfColours = nthrcol(threadBlockID)
 opDat1SharedIndirectionSize = ind_sizes(0 + threadBlockID * 4)
 opDat3SharedIndirectionSize = ind_sizes(1 + threadBlockID * 4)
@@ -799,63 +635,40 @@ DO i1 = 0, opDat5SharedIndirectionSize - 1, 1
     opDat5SharedIndirection(i2 + i1 * 4 + 1) = 0
   END DO
 END DO
-call system_clock(time1g, count_rateg, count_maxg)
-do i1 = 0, numberOfActiveThreads - 1, 1
-  arg1(i1 + 1) = opDat1SharedIndirection(1 + mappingArray1(i1 + threadBlockOffset)*2)
-  arg1(i1 + numberOfActiveThreads + 1) = opDat1SharedIndirection(1 + mappingArray1(i1 + threadBlockOffset) * 2 + 1)
-  arg2(i1 + 1) = opDat1SharedIndirection(1 + mappingArray2(i1 + threadBlockOffset) * 2)
-  arg2(i1 + numberOfActiveThreads + 1) = opDat1SharedIndirection(1 + mappingArray2(i1 + threadBlockOffset) * 2 + 1)
-  arg3(i1 + 1) = opDat3SharedIndirection(1 + mappingArray3(i1 + threadBlockOffset) * 4)
-  arg3(i1 + numberOfActiveThreads + 1) = opDat3SharedIndirection(1 + mappingArray3(i1 + threadBlockOffset) * 4 + 1)
-  arg3(i1 + 2*numberOfActiveThreads + 1) = opDat3SharedIndirection(1 + mappingArray3(i1 + threadBlockOffset) * 4 + 2)
-  arg3(i1 + 3*numberOfActiveThreads + 1) = opDat3SharedIndirection(1 + mappingArray3(i1 + threadBlockOffset) * 4 + 3)
-  arg4(i1 + 1) = opDat4SharedIndirection(1 + mappingArray4(i1 + threadBlockOffset))
-  arg5(i1+1) = 0.d0
-  arg5(i1+numberOfActiveThreads+1)=0.d0
-  arg5(i1+2*numberOfActiveThreads+1)=0.d0
-  arg5(i1+3*numberOfActiveThreads+1)=0.d0
+do i1 = 0, numberOfActiveThreads - 1, BS
+  arg5 = 0.d0
+  do i2 = 0, BS - 1
+    arg1(i2, :) = opDat1SharedIndirection(1 + mappingArray1(i1 + i2 + threadBlockOffset) * 2 : 1 + mappingArray1(i1 + i2 + threadBlockOffset) * 2 + 1)
+    arg2(i2, :) = opDat1SharedIndirection(1 + mappingArray2(i1 + i2 + threadBlockOffset) * 2 : 1 + mappingArray2(i1 + i2 + threadBlockOffset) * 2 + 1)
+    arg3(i2, :) = opDat3SharedIndirection(1 + mappingArray3(i1 + i2 + threadBlockOffset) * 4 : 1 + mappingArray3(i1 + i2 + threadBlockOffset) * 4 + 3)
+    arg4(i2) = opDat4SharedIndirection(1 + mappingArray4(i1 + i2 + threadBlockOffset))
+  end do
+  call bres_calc_kernel_vector(arg1, arg2, arg3, arg4, arg5, opDat6(threadBlockOffset + i1: threadBlockOffset + i1 + BS - 1))
+  do i2 = 0, BS - 1
+    opDat1SharedIndirection(1 + mappingArray1(i1 + i2 + threadBlockOffset) * 2 : 1 + mappingArray1(i1 + i2 + threadBlockOffset) * 2 + 1)  = arg1(i2, :)
+    opDat1SharedIndirection(1 + mappingArray2(i1 + i2 + threadBlockOffset) * 2 : 1 + mappingArray2(i1 + i2 + threadBlockOffset) * 2 + 1)  = arg2(i2, :)
+    opDat3SharedIndirection(1 + mappingArray3(i1 + i2 + threadBlockOffset) * 4 : 1 + mappingArray3(i1 + i2 + threadBlockOffset) * 4 + 3)  = arg3(i2, :)
+    opDat4SharedIndirection(1 + mappingArray4(i1 + i2 + threadBlockOffset)) = arg4(i2)
+  end do
+  do i2 = 0, BS - 1
+    colour2 = -1
+    colour2 = thrcol(i1 + i2 + threadBlockOffset)
+    opDat5Map = mappingArray5(i1 + i2 + threadBlockOffset)
+    do colour1 = 0, numOfColours -1, 1
+      if (colour2 .EQ. colour1) then
+        do i3 = 0, 4 - 1, 1
+          opDat5SharedIndirection(1 + (i3 + opDat5Map * 4)) = opDat5SharedIndirection(1 + (i3 + opDat5Map * 4)) + arg5(i2 + 1, i3 + 1)
+          end do
+      end if
+    end do
+  end do
 end do
-call system_clock(time1,count_rate,count_max)
-call bres_calc_kernel_caller(arg1, arg2, arg3, arg4, arg5, opDat6(threadBlockOffset: threadBlockOffset+numberOfActiveThreads -1), numberOfActiveThreads)
-call system_clock(time2, count_rate,count_max)
-print *, "### bres_calc", time2 - time1
-do i1 = 0, numberOfActiveThreadsCeiling - 1, 1
-opDat1SharedIndirection(1+mappingArray1(i1+threadBlockOffset)*2)=arg1(i1+1)
-opDat1SharedIndirection(1+mappingArray1(i1+threadBlockOffset)*2+1)=arg1(i1+numberOfActiveThreads+1)
-opDat1SharedIndirection(1+mappingArray2(i1+threadBlockOffset)*2)=arg2(i1+1)
-opDat1SharedIndirection(1+mappingArray2(i1+threadBlockOffset)*2+1)=arg2(i1+numberOfActiveThreads+1)
-opDat3SharedIndirection(1+mappingArray3(i1+threadBlockOffset)*4)=arg3(i1+1)
-opDat3SharedIndirection(1+mappingArray3(i1+threadBlockOffset)*4+1)=arg3(i1+numberOfActiveThreads+1)
-opDat3SharedIndirection(1+mappingArray3(i1+threadBlockOffset)*4+2)=arg3(i1+2*numberOfActiveThreads+1)
-opDat3SharedIndirection(1+mappingArray3(i1+threadBlockOffset)*4+3)=arg3(i1+3*numberOfActiveThreads+1)
-opDat4SharedIndirection(1+mappingArray4(i1+threadBlockOffset))=arg4(i1+1)
-end do
-call system_clock(time2g, count_rateg, count_maxg)
-print *, "### bres_gather", time2g - time1g
-
-DO i1 = 0, numberOfActiveThreadsCeiling - 1, 1
-  colour2 = -1
-   colour2 = thrcol(i1 + threadBlockOffset)
-  opDat5Map = mappingArray5(i1 + threadBlockOffset)
-  DO colour1 = 0, numOfColours - 1, 1
-    IF (colour2 .EQ. colour1) THEN
-      DO i2 = 0, 4 - 1, 1
-        opDat5SharedIndirection(1 + (i2 + opDat5Map * 4)) = opDat5SharedIndirection(1 + (i2 + opDat5Map * 4)) + arg5(i2*numberOfActiveThreadsCeiling + i1 + 1)
-      END DO
-    END IF
-  END DO
-END DO
 
 DO i1 = 0, opDat5SharedIndirectionSize - 1, 1
 DO i2 = 0, 4 - 1, 1
 opDat5(i2 + opDat5IndirectionMap(i1 + 1) * 4) = opDat5(i2 + opDat5IndirectionMap(i1 + 1) * 4) + opDat5SharedIndirection(1 + (i2 + i1 * 4))
 END DO
 END DO
-deallocate (arg1)
-deallocate (arg2)
-deallocate (arg3)
-deallocate (arg4)
-deallocate (arg5)
 END SUBROUTINE 
 
 SUBROUTINE bres_calc_host(userSubroutine,set,opDat1,opIndirection1,opMap1,opAccess1,opDat2,opIndirection2,opMap2,opAccess2,opDat3,opIndirection3,opMap3,opAccess3,opDat4,opIndirection4,opMap4,opAccess4,opDat5,opIndirection5,opMap5,opAccess5,opDat6,opIndirection6,opMap6,opAccess6)
@@ -1111,38 +924,34 @@ res1(4) = res1(4) + f
 res2(4) = res2(4) - f
 END SUBROUTINE 
 
-subroutine res_calc_kernel_caller(x1,x2,q1,q2,adt1,adt2,res1,res2,iterations)
+subroutine res_calc_kernel_vector(x1,x2,q1,q2,adt1,adt2,res1,res2)
   implicit none
-  real(kind=8), dimension(BS, iterations/BS, 2) :: x1,x2
-  real(kind=8), dimension(BS, iterations/BS, 4) :: q1,q2
-  real(kind=8), dimension(BS, iterations/BS) :: adt1,adt2
-  real(kind=8), dimension(BS, iterations/BS, 4) :: res1,res2
-  integer :: iterations
-  integer :: i
+  real(kind=8), dimension(BS, 2) :: x1,x2
+  real(kind=8), dimension(BS, 4) :: q1,q2
+  real(kind=8), dimension(BS) :: adt1,adt2
+  real(kind=8), dimension(BS, 4) :: res1,res2
   real(kind=8), dimension(BS) :: dx,dy,mu,ri,p1,vol1,p2,vol2,f
-  do i = 1, iterations/BS
-    dx(:) = x1(:, i, 1) - x2(:, i, 1)
-    dy(:) = x1(:, i, 2) - x2(:, i, 2)
-    ri(:) = 1.0 / q1(:, i, 1)
-    p1(:) = gm1_OP2_CONSTANT * (q1(:, i, 4) - 0.5 * ri(:) * (q1(:, i, 2) * q1(:, i, 2) + q1(:, i, 3) * q1(:, i, 3)))
-    vol1(:) = ri(:) * (q1(:, i, 2) * dy(:) - q1(:, i, 3) * dx(:))
-    ri(:) = 1.0 / q2(:, i, 1)
-    p2(:) = gm1_OP2_CONSTANT * (q2(:, i, 4) - 0.5 * ri(:) * (q2(:, i, 2) * q2(:, i, 2) + q2(:, i, 3) * q2(:, i, 3)))
-    vol2(:) = ri(:) * (q2(:, i, 2) * dy(:) - q2(:, i, 3) * dx(:))
-    mu(:) = 0.5 * (adt1(:, i) + adt2(:, i)) * eps_OP2_CONSTANT
-    f(:) = 0.5 * (vol1(:) * q1(:, i, 1) + vol2(:) * q2(:, i, 1)) + mu(:) * (q1(:, i, 1) - q2(:, i, 1))
-    res1(:, i, 1) = res1(:, i, 1) + f(:)
-    res2(:, i, 1) = res2(:, i, 1) - f(:)
-    f(:) = 0.5 * (vol1(:) * q1(:, i, 2) + p1(:) * dy(:) + vol2(:) * q2(:, i, 2) + p2(:) * dy(:)) + mu(:) * (q1(:, i, 2) - q2(:, i, 2))
-    res1(:, i, 2) = res1(:, i, 2) + f(:)
-    res2(:, i, 2) = res2(:, i, 2) - f(:)
-    f(:) = 0.5 * (vol1(:) * q1(:, i, 3) - p1(:) * dx(:) + vol2(:) * q2(:, i, 3) - p2(:) * dx(:)) + mu(:) * (q1(:, i, 3) - q2(:, i, 3))
-    res1(:, i, 3) = res1(:, i, 3) + f(:)
-    res2(:, i, 3) = res2(:, i, 3) - f(:)
-    f(:) = 0.5 * (vol1(:) * (q1(:, i, 4) + p1(:)) + vol2(:) * (q2(:, i, 4) + p2(:))) + mu(:) * (q1(:, i, 4) - q2(:, i, 4))
-    res1(:, i, 4) = res1(:, i, 4) + f(:)
-    res2(:, i, 4) = res2(:, i, 4) - f(:)
-  end do
+  dx(:) = x1(:, 1) - x2(:, 1)
+  dy(:) = x1(:, 2) - x2(:, 2)
+  ri(:) = 1.0 / q1(:, 1)
+  p1(:) = gm1_OP2_CONSTANT * (q1(:, 4) - 0.5 * ri(:) * (q1(:, 2) * q1(:, 2) + q1(:, 3) * q1(:, 3)))
+  vol1(:) = ri(:) * (q1(:, 2) * dy(:) - q1(:, 3) * dx(:))
+  ri(:) = 1.0 / q2(:, 1)
+  p2(:) = gm1_OP2_CONSTANT * (q2(:, 4) - 0.5 * ri(:) * (q2(:, 2) * q2(:, 2) + q2(:, 3) * q2(:, 3)))
+  vol2(:) = ri(:) * (q2(:, 2) * dy(:) - q2(:, 3) * dx(:))
+  mu(:) = 0.5 * (adt1(:) + adt2(:)) * eps_OP2_CONSTANT
+  f(:) = 0.5 * (vol1(:) * q1(:, 1) + vol2(:) * q2(:, 1)) + mu(:) * (q1(:, 1) - q2(:, 1))
+  res1(:, 1) = res1(:, 1) + f(:)
+  res2(:, 1) = res2(:, 1) - f(:)
+  f(:) = 0.5 * (vol1(:) * q1(:, 2) + p1(:) * dy(:) + vol2(:) * q2(:, 2) + p2(:) * dy(:)) + mu(:) * (q1(:, 2) - q2(:, 2))
+  res1(:, 2) = res1(:, 2) + f(:)
+  res2(:, 2) = res2(:, 2) - f(:)
+  f(:) = 0.5 * (vol1(:) * q1(:, 3) - p1(:) * dx(:) + vol2(:) * q2(:, 3) - p2(:) * dx(:)) + mu(:) * (q1(:, 3) - q2(:, 3))
+  res1(:, 3) = res1(:, 3) + f(:)
+  res2(:, 3) = res2(:, 3) - f(:)
+  f(:) = 0.5 * (vol1(:) * (q1(:, 4) + p1(:)) + vol2(:) * (q2(:, 4) + p2(:))) + mu(:) * (q1(:, 4) - q2(:, 4))
+  res1(:, 4) = res1(:, 4) + f(:)
+  res2(:, 4) = res2(:, 4) - f(:)
 end subroutine
 
 SUBROUTINE res_calc_kernel(opDat1,opDat3,opDat5,opDat7,ind_maps1,ind_maps3,ind_maps5,ind_maps7,mappingArray1,mappingArray2,mappingArray3,mappingArray4,mappingArray5,mappingArray6,mappingArray7,mappingArray8,ind_sizes,ind_offs,blkmap,offset,nelems,nthrcol,thrcol,blockOffset,blockID)
@@ -1177,6 +986,7 @@ INTEGER(kind=4) :: threadBlockID
 INTEGER(kind=4) :: numberOfActiveThreads
 INTEGER(kind=4) :: i1
 INTEGER(kind=4) :: i2
+INTEGER(kind=4) :: i3
 INTEGER(kind=4), POINTER, DIMENSION(:) :: opDat1IndirectionMap
 REAL(kind=8), POINTER, DIMENSION(:) :: opDat1SharedIndirection
 REAL(kind=8), DIMENSION(0:8000 - 1), TARGET :: sharedFloat8
@@ -1208,21 +1018,14 @@ INTEGER(kind=4) :: colour1
 INTEGER(kind=4) :: colour2
 integer(8) :: time1, time2, count_rate, count_max
 integer(8) :: time1g, time2g, count_rateg, count_maxg
-real(kind=8), allocatable, dimension(:) :: arg1, arg2, arg3
-real(kind=8), allocatable, dimension(:) :: arg4, arg5, arg6
-real(kind=8), allocatable, dimension(:) :: arg7, arg8
+real(kind=8), dimension(0:BS - 1, 2) :: arg1, arg2
+real(kind=8), dimension(0:BS - 1, 4) :: arg3, arg4
+real(kind=8), dimension(0:BS - 1) ::  arg5, arg6
+real(kind=8), dimension(BS, 4) :: arg7, arg8
 threadBlockID = blkmap(blockID + blockOffset)
 numberOfActiveThreads = nelems(threadBlockID)
 threadBlockOffset = offset(threadBlockID)
 numberOfActiveThreadsCeiling = numberOfActiveThreads
-allocate (arg1(numberOfActiveThreads*2))
-allocate (arg2(numberOfActiveThreads*2))
-allocate (arg3(numberOfActiveThreads*4))
-allocate (arg4(numberOfActiveThreads*4))
-allocate (arg5(numberOfActiveThreads))
-allocate (arg6(numberOfActiveThreads))
-allocate (arg7(numberOfActiveThreads*4))
-allocate (arg8(numberOfActiveThreads*4))
 numOfColours = nthrcol(threadBlockID)
 opDat1SharedIndirectionSize = ind_sizes(0 + threadBlockID * 4)
 opDat3SharedIndirectionSize = ind_sizes(1 + threadBlockID * 4)
@@ -1264,90 +1067,48 @@ opDat7SharedIndirection(i2 + i1 * 4 + 1) = 0
 END DO
 END DO
 
-call system_clock(time1g, count_rateg, count_maxg)
-do i1=0, numberOfActiveThreads -1, 1
-arg1(i1+1)=opDat1SharedIndirection(1+mappingArray1(i1+threadBlockOffset)*2)
-arg1(i1+numberOfActiveThreads+1)=opDat1SharedIndirection(1+mappingArray1(i1+threadBlockOffset)*2+1)
-arg2(i1+1)=opDat1SharedIndirection(1+mappingArray2(i1+threadBlockOffset)*2)
-arg2(i1+numberOfActiveThreads+1)=opDat1SharedIndirection(1+mappingArray2(i1+threadBlockOffset)*2+1)
-arg3(i1+1)=opDat3SharedIndirection(1+mappingArray3(i1+threadBlockOffset)*4)
-arg3(i1+numberOfActiveThreads+1)=opDat3SharedIndirection(1+mappingArray3(i1+threadBlockOffset)*4+1)
-arg3(i1+2*numberOfActiveThreads+1)=opDat3SharedIndirection(1+mappingArray3(i1+threadBlockOffset)*4+2)
-arg3(i1+3*numberOfActiveThreads+1)=opDat3SharedIndirection(1+mappingArray3(i1+threadBlockOffset)*4+3)
-arg4(i1+1)=opDat3SharedIndirection(1+mappingArray4(i1+threadBlockOffset)*4)
-arg4(i1+numberOfActiveThreads+1)=opDat3SharedIndirection(1+mappingArray4(i1+threadBlockOffset)*4+1)
-arg4(i1+2*numberOfActiveThreads+1)=opDat3SharedIndirection(1+mappingArray4(i1+threadBlockOffset)*4+2)
-arg4(i1+3*numberOfActiveThreads+1)=opDat3SharedIndirection(1+mappingArray4(i1+threadBlockOffset)*4+3)
-arg5(i1+1)=opDat5SharedIndirection(1+mappingArray5(i1+threadBlockOffset))
-arg6(i1+1)=opDat5SharedIndirection(1+mappingArray6(i1+threadBlockOffset))
-arg7(i1+1) = 0.d0
-arg7(i1+numberOfActiveThreads+1)=0.d0
-arg7(i1+2*numberOfActiveThreads+1)=0.d0
-arg7(i1+3*numberOfActiveThreads+1)=0.d0
-arg8(i1+1) = 0.d0
-arg8(i1+numberOfActiveThreads+1)=0.d0
-arg8(i1+2*numberOfActiveThreads+1)=0.d0
-arg8(i1+3*numberOfActiveThreads+1)=0.d0
+do i1 = 0, numberOfActiveThreads - 1, BS
+  arg7 = 0.d0
+  arg8 = 0.d0
+  do i2 = 0, BS - 1
+    arg1(i2, :) = opDat1SharedIndirection(1 + mappingArray1(i1 + i2 + threadBlockOffset) * 2 : 1 + mappingArray1(i1 + i2 + threadBlockOffset) * 2 + 1)
+    arg2(i2, :) = opDat1SharedIndirection(1 + mappingArray2(i1 + i2 + threadBlockOffset) * 2 : 1 + mappingArray2(i1 + i2 + threadBlockOffset) * 2 + 1)
+    arg3(i2, :) = opDat3SharedIndirection(1 + mappingArray3(i1 + i2 + threadBlockOffset) * 4 : 1 + mappingArray3(i1 + i2 + threadBlockOffset) * 4 + 3)
+    arg4(i2, :) = opDat3SharedIndirection(1 + mappingArray4(i1 + i2 + threadBlockOffset) * 4 : 1 + mappingArray4(i1 + i2 + threadBlockOffset) * 4 + 3)
+    arg5(i2) = opDat5SharedIndirection(1 + mappingArray5(i1 + i2 + threadBlockOffset))
+    arg6(i2) = opDat5SharedIndirection(1 + mappingArray6(i1 + i2 + threadBlockOffset))
+  end do
+  call res_calc_kernel_vector(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8)
+  do i2 = 0, BS - 1
+    opDat1SharedIndirection(1 + mappingArray1(i1 + i2 + threadBlockOffset) * 2 : 1 + mappingArray1(i1 + i2 + threadBlockOffset) * 2 + 1) = arg1(i2, :)
+    opDat1SharedIndirection(1 + mappingArray2(i1 + i2 + threadBlockOffset) * 2 : 1 + mappingArray2(i1 + i2 + threadBlockOffset) * 2 + 1) = arg2(i2, :)
+    opDat3SharedIndirection(1 + mappingArray3(i1 + i2 + threadBlockOffset) * 4 : 1 + mappingArray3(i1 + i2 + threadBlockOffset) * 4 + 3) = arg3(i2, :)
+    opDat3SharedIndirection(1 + mappingArray4(i1 + i2 + threadBlockOffset) * 4 : 1 + mappingArray4(i1 + i2 + threadBlockOffset) * 4 + 3) = arg4(i2, :)
+    opDat5SharedIndirection(1 + mappingArray5(i1 + i2 + threadBlockOffset)) = arg5(i2)
+    opDat5SharedIndirection(1 + mappingArray6(i1 + i2 + threadBlockOffset)) = arg6(i2)
+  end do
+  do i2 = 0, BS - 1
+    colour2 = thrcol(i1 + i2 + threadBlockOffset)
+    opDat7Map = mappingArray7(i1 + i2 + threadBlockOffset)
+    opDat8Map = mappingArray8(i1 + i2 + threadBlockOffset)
+    do colour1 = 0, numOfColours - 1, 1
+    if (colour2 .eq. colour1) then
+      do i3 = 0, 4 - 1, 1
+        opDat7SharedIndirection(1 + (i3 + opDat7Map * 4)) = opDat7SharedIndirection(1 + (i3 + opDat7Map * 4)) + arg7(i2 + 1, i3 + 1)
+      end do
+      do i3 = 0, 4 - 1, 1
+        opDat7SharedIndirection(1 + (i3 + opDat8Map * 4)) = opDat7SharedIndirection(1 + (i3 + opDat8Map * 4)) + arg8(i2 + 1, i3 + 1)
+      end do
+    end if
+    end do
+  end do
 end do
-call system_clock(time1,count_rate, count_max)
-
-call res_calc_kernel_caller(arg1,arg2,arg3,arg4,arg5,arg6,arg7,arg8,numberOfActiveThreads)
-
-
-call system_clock(time2,count_rate, count_max)
-print *, "### res_calc", time2 - time1
-
-do i1=0, numberOfActiveThreads -1, 1
-opDat1SharedIndirection(1+mappingArray1(i1+threadBlockOffset)*2)=arg1(i1+1)
-opDat1SharedIndirection(1+mappingArray1(i1+threadBlockOffset)*2+1)=arg1(i1+numberOfActiveThreads+1)
-opDat1SharedIndirection(1+mappingArray2(i1+threadBlockOffset)*2)=arg2(i1+1)
-opDat1SharedIndirection(1+mappingArray2(i1+threadBlockOffset)*2+1)=arg2(i1+numberOfActiveThreads+1)
-opDat3SharedIndirection(1+mappingArray3(i1+threadBlockOffset)*4)=arg3(i1+1)
-opDat3SharedIndirection(1+mappingArray3(i1+threadBlockOffset)*4+1)=arg3(i1+numberOfActiveThreads+1)
-opDat3SharedIndirection(1+mappingArray3(i1+threadBlockOffset)*4+2)=arg3(i1+2*numberOfActiveThreads+1)
-opDat3SharedIndirection(1+mappingArray3(i1+threadBlockOffset)*4+3)=arg3(i1+3*numberOfActiveThreads+1)
-opDat3SharedIndirection(1+mappingArray4(i1+threadBlockOffset)*4)=arg4(i1+1)
-opDat3SharedIndirection(1+mappingArray4(i1+threadBlockOffset)*4+1)=arg4(i1+numberOfActiveThreads+1)
-opDat3SharedIndirection(1+mappingArray4(i1+threadBlockOffset)*4+2)=arg4(i1+2*numberOfActiveThreads+1)
-opDat3SharedIndirection(1+mappingArray4(i1+threadBlockOffset)*4+3)=arg4(i1+3*numberOfActiveThreads+1)
-opDat5SharedIndirection(1+mappingArray5(i1+threadBlockOffset))=arg5(i1+1)
-opDat5SharedIndirection(1+mappingArray6(i1+threadBlockOffset))=arg6(i1+1)
-end do
-
-call system_clock(time2g, count_rateg, count_maxg)
-print *, "### res_gather", time2g - time1g
-
-
-DO i1 = 0, numberOfActiveThreadsCeiling - 1, 1
-colour2 = -1
-colour2 = thrcol(i1 + threadBlockOffset)
-opDat7Map = mappingArray7(i1 + threadBlockOffset)
-opDat8Map = mappingArray8(i1 + threadBlockOffset)
-DO colour1 = 0, numOfColours - 1, 1
-IF (colour2 .EQ. colour1) THEN
-DO i2 = 0, 4 - 1, 1
-opDat7SharedIndirection(1 + (i2 + opDat7Map * 4)) = opDat7SharedIndirection(1 + (i2 + opDat7Map * 4)) + arg7(i2*numberOfActiveThreadsCeiling + i1 + 1)
-END DO
-DO i2 = 0, 4 - 1, 1
-opDat7SharedIndirection(1 + (i2 + opDat8Map * 4)) = opDat7SharedIndirection(1 + (i2 + opDat8Map * 4)) + arg8(i2*numberOfActiveThreadsCeiling + i1 + 1)
-END DO
-END IF
-END DO
-END DO
 
 DO i1 = 0, opDat7SharedIndirectionSize - 1, 1
 DO i2 = 0, 4 - 1, 1
 opDat7(i2 + opDat7IndirectionMap(i1 + 1) * 4) = opDat7(i2 + opDat7IndirectionMap(i1 + 1) * 4) + opDat7SharedIndirection(1 + (i2 + i1 * 4))
 END DO
 END DO
-deallocate (arg1)
-deallocate (arg2)
-deallocate (arg3)
-deallocate (arg4)
-deallocate (arg5)
-deallocate (arg6)
-deallocate (arg7)
-deallocate (arg8)
 END SUBROUTINE 
 
 SUBROUTINE res_calc_host(userSubroutine,set,opDat1,opIndirection1,opMap1,opAccess1,opDat2,opIndirection2,opMap2,opAccess2,opDat3,opIndirection3,opMap3,opAccess3,opDat4,opIndirection4,opMap4,opAccess4,opDat5,opIndirection5,opMap5,opAccess5,opDat6,opIndirection6,opMap6,opAccess6,opDat7,opIndirection7,opMap7,opAccess7,opDat8,opIndirection8,opMap8,opAccess8)
@@ -1636,10 +1397,7 @@ call mkl_domatcopy('r','t',diff,4,1.d0,opDat1(4*sliceStart:4*sliceEnd-1),4,topDa
 call mkl_domatcopy('r','t',diff,4,1.d0,opDat2(4*sliceStart:4*sliceEnd-1),4,topDat2,diff)
 call system_clock(time2, count_rate, count_max)
 print *, "### not counted", time2 - time1
-call system_clock(time1, count_rate, count_max)
 CALL save_soln_caller(topDat1, topDat2, diff)
-call system_clock(time2, count_rate, count_max)
-print *, "### save_soln", time2 - time1
 call system_clock(time1, count_rate, count_max)
 call mkl_domatcopy('r','t',4,diff,1.d0,topDat1,diff,opDat1(4*sliceStart:4*sliceEnd-1),4)
 call mkl_domatcopy('r','t',4,diff,1.d0,topDat2,diff,opDat2(4*sliceStart:4*sliceEnd-1),4)
@@ -1754,10 +1512,7 @@ call mkl_domatcopy('r', 't', diff, 4, 1.d0, opDat2(4*sliceStart:4*sliceEnd-1), 4
 call mkl_domatcopy('r', 't', diff, 4, 1.d0, opDat3(4*sliceStart:4*sliceEnd-1), 4, topDat3, diff)
 call system_clock(time2, count_rate, count_max)
 print *, "### not counted", time2 - time1
-call system_clock(time1, count_rate, count_max)
 call update_kernel_caller(topDat1, topDat2, topDat3, opDat4(sliceStart:sliceStart+diff-1), opDat5, diff)
-call system_clock(time2, count_rate, count_max)
-print *,"### update" ,time2 - time1
 call system_clock(time1, count_rate, count_max)
 call mkl_domatcopy('r', 't', 4, diff, 1.d0, topDat1, diff, opDat1(4*sliceStart:4*sliceEnd-1), 4)
 call mkl_domatcopy('r', 't', 4, diff, 1.d0, topDat2, diff, opDat2(4*sliceStart:4*sliceEnd-1), 4)
